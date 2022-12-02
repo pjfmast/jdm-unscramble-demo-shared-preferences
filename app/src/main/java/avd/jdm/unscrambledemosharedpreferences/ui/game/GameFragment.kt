@@ -1,6 +1,8 @@
 package avd.jdm.unscrambledemosharedpreferences.ui.game
 
+import android.content.Context
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,7 +12,9 @@ import androidx.fragment.app.viewModels
 import avd.jdm.unscrambledemosharedpreferences.R
 import avd.jdm.unscrambledemosharedpreferences.databinding.GameFragmentBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import java.time.LocalDateTime
 
+private const val TAG = "GameFragment"
 /**
  * Fragment where the game is played, contains the game logic.
  */
@@ -84,8 +88,15 @@ class GameFragment : Fragment() {
      * Creates and shows an AlertDialog with final score.
      */
     private fun showFinalScoreDialog() {
+        val oldHighScore: Int = getHighScore()
+        val newScore = viewModel.score.value ?: 0
+        val title = if (oldHighScore >= newScore) (
+                getString((R.string.congratulations))
+                ) else (getString(R.string.new_high_score, oldHighScore, newScore))
+
+
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle(getString(R.string.congratulations))
+            .setTitle(title)
             .setMessage(getString(R.string.you_scored, viewModel.score.value))
             .setCancelable(false)
             .setNegativeButton(getString(R.string.exit)) { _, _ ->
@@ -95,6 +106,26 @@ class GameFragment : Fragment() {
                 restartGame()
             }
             .show()
+
+        updateHighScore()
+    }
+
+    private fun getHighScore(): Int {
+        val sharedPreferences = activity?.getPreferences(Context.MODE_PRIVATE) ?: return -1
+        Log.d(TAG, "getHighScore(): stored preferences " + sharedPreferences.all)
+
+        return sharedPreferences.getInt(getString(R.string.saved_high_score_value), -1)
+    }
+
+    private fun updateHighScore() {
+        val sharedPreferences = activity?.getPreferences(Context.MODE_PRIVATE) ?: return
+
+        with(sharedPreferences.edit()) {
+            val newHighScore = viewModel.score.value ?: 0
+            putInt(getString(R.string.saved_high_score_value), newHighScore)
+            putString(getString(R.string.saved_high_score_date), LocalDateTime.now().toString())
+            apply()
+        }
     }
 
     /*

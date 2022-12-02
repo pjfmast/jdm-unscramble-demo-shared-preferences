@@ -11,4 +11,7 @@
     <string name="exit">Exit</string>
     <string name="play_again">Play Again</string>
     <string name="try_again">Try again!</string>
+    <string name="new_high_score">New high score! (old: %d, new: %d)</string>
+    <string name="saved_high_score_value">saved_high_score_value</string>
+    <string name="saved_high_score_date">saved_high_score_date</string>
 </resources>
