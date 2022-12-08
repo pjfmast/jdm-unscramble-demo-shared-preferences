@@ -14,8 +14,9 @@ import avd.jdm.unscrambledemosharedpreferences.data.SettingsDataStore
 import avd.jdm.unscrambledemosharedpreferences.data.dataStore
 import avd.jdm.unscrambledemosharedpreferences.databinding.GameFragmentBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.time.LocalDateTime
 
 private const val TAG = "GameFragment"
 
@@ -28,13 +29,27 @@ class GameFragment : Fragment() {
     private lateinit var binding: GameFragmentBinding
     private lateinit var gameSettingsDataStore: SettingsDataStore
 
-    // Keeps track of which LayoutManager is in use for the [RecyclerView]
-    private var highScoreValue = 0
+    // Keeps track of saved high score values (important when unscramble game is played again)
+    private var highScorePoints = 0
+    private var highScoreDateTime = ""
 
     // Create a ViewModel the first time the fragment is created.
     // If the fragment is re-created, it receives the same GameViewModel instance created by the
     // first fragment.
     private val viewModel: GameViewModel by viewModels()
+
+    // to initialise the LiveData<HighScoreData> start emitting the first value:
+    // see: https://developer.android.com/topic/libraries/architecture/datastore#synchronous
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val dataStore = requireContext().dataStore
+        gameSettingsDataStore = SettingsDataStore(dataStore)
+
+        lifecycleScope.launch {
+            dataStore.data.first()
+        }
+
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -60,14 +75,30 @@ class GameFragment : Fragment() {
         binding.submit.setOnClickListener { onSubmitWord() }
         binding.skip.setOnClickListener { onSkipWord() }
 
-        // Initialize SettingsDataStore
-        gameSettingsDataStore = SettingsDataStore(requireContext().dataStore)
-        gameSettingsDataStore.preferenceFlow.asLiveData().observe(viewLifecycleOwner, { })
-        gameSettingsDataStore.preferenceFlow.asLiveData().observe(viewLifecycleOwner, { value ->
-            highScoreValue = value
-        })
+        // Initialize SettingsDataStore, because updates are started when the activity is active
+        // the first read is triggered in onCreate()
+        gameSettingsDataStore.readFromDataStore.asLiveData().observe(viewLifecycleOwner) { }
+        gameSettingsDataStore.readFromDataStore.asLiveData().observe(viewLifecycleOwner) { value ->
+            highScorePoints = value.highscorePoints
+            highScoreDateTime = value.highscoreDateTime
+        }
 
+    }
 
+    override fun onResume() {
+        showHighScoreChallenge()
+        super.onResume()
+    }
+
+    private fun showHighScoreChallenge() {
+        if (highScorePoints > 0) {
+            Snackbar.make(
+                requireView(),
+                "Try challenge current highscore: $highScorePoints scored at $highScoreDateTime!!",
+                Snackbar.LENGTH_LONG
+            ).setAnchorView(binding.textViewInstructions)
+                .show()
+        }
     }
 
     /*
@@ -106,30 +137,36 @@ class GameFragment : Fragment() {
      */
     private fun showFinalScoreDialog() {
         val newScore = viewModel.score.value ?: 0
-        val title = if (newScore < highScoreValue) (
-                getString((R.string.congratulations))
-                ) else (getString(R.string.new_high_score, highScoreValue, newScore))
+        saveNewScore(newScore)
 
-        if (newScore > highScoreValue) {
+        val title = if (newScore < highScorePoints) (
+                getString((R.string.congratulations))
+                ) else (getString(R.string.new_high_score, highScorePoints, newScore))
+
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(title)
+            .setMessage(getString(R.string.you_scored, viewModel.score.value))
+            .setCancelable(false)
+            .setNegativeButton(getString(R.string.exit)) { _, _ ->
+                exitGame()
+            }
+            .setPositiveButton(getString(R.string.play_again)) { dialog, _ ->
+                restartGame()
+                dialog?.dismiss()
+            }
+            .show()
+
+// not needed anymore, SharedPreferences replaced with Preferences DataStore:
+        // updateHighScore()
+    }
+
+    private fun saveNewScore(newScore: Int) {
+        if (newScore > highScorePoints) {
             lifecycleScope.launch {
-                gameSettingsDataStore.saveHighScoreToPreferencesStore(newScore, requireContext())
+                gameSettingsDataStore.saveToDataStore(newScore, requireContext())
             }
         }
-
-            MaterialAlertDialogBuilder(requireContext())
-                .setTitle(title)
-                .setMessage(getString(R.string.you_scored, viewModel.score.value))
-                .setCancelable(false)
-                .setNegativeButton(getString(R.string.exit)) { _, _ ->
-                    exitGame()
-                }
-                .setPositiveButton(getString(R.string.play_again)) { _, _ ->
-                    restartGame()
-                }
-                .show()
-
-// not needed anymore, SharedPreferences replaced wih Preferences DataStore:
-    // updateHighScore()
     }
 
 /*// not needed anymore, SharedPreferences replaced wih Preferences DataStore:
@@ -159,6 +196,7 @@ class GameFragment : Fragment() {
     private fun restartGame() {
         viewModel.reinitializeData()
         setErrorTextField(false)
+        showHighScoreChallenge()
     }
 
     /*

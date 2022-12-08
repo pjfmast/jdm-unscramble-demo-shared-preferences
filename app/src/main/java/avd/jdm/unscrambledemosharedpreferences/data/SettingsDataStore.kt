@@ -10,19 +10,23 @@ import kotlinx.coroutines.flow.map
 import java.io.IOException
 import java.time.LocalDateTime
 
-private const val HIGH_SCORE_PREFERENCES_NAME = "high_score_preferences"
 
 // Create a DataStore instance using the preferencesDataStore delegate, with the Context as
 // receiver.
-val Context.dataStore : DataStore<Preferences> by preferencesDataStore(
-    name = HIGH_SCORE_PREFERENCES_NAME
+val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "unscramble_datastore"
 )
 
-class SettingsDataStore(preference_datastore: DataStore<Preferences>) {
+data class HighScoreData(
+    val highscorePoints: Int = 0,
+    val highscoreDateTime: String = ""
+)
+
+class SettingsDataStore(private val preference_datastore: DataStore<Preferences>) {
     private val HIGH_SCORE_VALUE = intPreferencesKey("saved_high_score_value")
     private val HIGH_SCORE_DATETIME = stringPreferencesKey("saved_high_score_datetime")
 
-    val preferenceFlow: Flow<Int> = preference_datastore.data
+    val readFromDataStore: Flow<HighScoreData> = preference_datastore.data
         .catch {
             if (it is IOException) {
                 it.printStackTrace()
@@ -32,15 +36,26 @@ class SettingsDataStore(preference_datastore: DataStore<Preferences>) {
             }
         }
         .map { preferences ->
-            preferences[HIGH_SCORE_DATETIME] ?: ""
-            // On the first run of the app, we will return a high_score value of 0 by default
-            preferences[HIGH_SCORE_VALUE] ?: 0
+            val highscorePoints = preferences[HIGH_SCORE_VALUE] ?: 0
+            val highscoreDateTime = preferences[HIGH_SCORE_DATETIME] ?: ""
+            HighScoreData(
+                // On the first run of the app, we will return a high_score value of 0 by default
+                highscorePoints,
+                highscoreDateTime
+            )
         }
 
-    suspend fun saveHighScoreToPreferencesStore(newHighScore: Int, context: Context) {
+    suspend fun saveToDataStore(newHighScore: Int, context: Context) {
         context.dataStore.edit { preferences ->
             preferences[HIGH_SCORE_DATETIME] = LocalDateTime.now().toString()
             preferences[HIGH_SCORE_VALUE] = newHighScore
         }
     }
+
+    suspend fun clearDataStore(context: Context) {
+        context.dataStore.edit { preferences ->
+            preferences.clear()
+        }
+    }
+
 }
