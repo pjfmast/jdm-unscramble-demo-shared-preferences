@@ -22,11 +22,11 @@ data class HighScoreData(
     val highscoreDateTime: String = ""
 )
 
-class SettingsDataStore(private val preference_datastore: DataStore<Preferences>) {
+class SettingsDataStore(context: Context) {
     private val HIGH_SCORE_VALUE = intPreferencesKey("saved_high_score_value")
     private val HIGH_SCORE_DATETIME = stringPreferencesKey("saved_high_score_datetime")
 
-    val readFromDataStore: Flow<HighScoreData> = preference_datastore.data
+    val readFromDataStore: Flow<HighScoreData> = context.dataStore.data
         .catch {
             if (it is IOException) {
                 it.printStackTrace()

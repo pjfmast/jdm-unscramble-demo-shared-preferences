@@ -43,7 +43,7 @@ class GameFragment : Fragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val dataStore = requireContext().dataStore
-        gameSettingsDataStore = SettingsDataStore(dataStore)
+        gameSettingsDataStore = SettingsDataStore(requireContext())
 
         lifecycleScope.launch {
             dataStore.data.first()
@@ -77,7 +77,6 @@ class GameFragment : Fragment() {
 
         // Initialize SettingsDataStore, because updates are started when the activity is active
         // the first read is triggered in onCreate()
-        gameSettingsDataStore.readFromDataStore.asLiveData().observe(viewLifecycleOwner) { }
         gameSettingsDataStore.readFromDataStore.asLiveData().observe(viewLifecycleOwner) { value ->
             highScorePoints = value.highscorePoints
             highScoreDateTime = value.highscoreDateTime
